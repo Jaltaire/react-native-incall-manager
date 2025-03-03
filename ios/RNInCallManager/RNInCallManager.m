@@ -120,7 +120,8 @@ RCT_EXPORT_MODULE(InCallManager)
 - (NSArray<NSString *> *)supportedEvents
 {
     return @[@"Proximity",
-             @"WiredHeadset"];
+             @"WiredHeadset",
+             @"onAudioDeviceChanged"];
 }
 
 RCT_EXPORT_METHOD(start:(NSString *)mediaType
@@ -822,6 +823,7 @@ RCT_EXPORT_METHOD(stopProximitySensor)
                                                @"deviceName": AVAudioSessionPortHeadphones,
                                            }];
                     }
+                    [self sendAudioDeviceChangedEvent];
                     break;
                 case AVAudioSessionRouteChangeReasonOldDeviceUnavailable:
                     NSLog(@"RNInCallManager.AudioRouteChange.Reason: OldDeviceUnavailable");
@@ -833,13 +835,16 @@ RCT_EXPORT_METHOD(stopProximitySensor)
                                                @"deviceName": @"",
                                            }];
                     }
+                    [self sendAudioDeviceChangedEvent];
                     break;
                 case AVAudioSessionRouteChangeReasonCategoryChange:
                     NSLog(@"RNInCallManager.AudioRouteChange.Reason: CategoryChange. category=%@ mode=%@", self->_audioSession.category, self->_audioSession.mode);
                     [self updateAudioRoute];
+                    [self sendAudioDeviceChangedEvent];
                     break;
                 case AVAudioSessionRouteChangeReasonOverride:
                     NSLog(@"RNInCallManager.AudioRouteChange.Reason: Override");
+                    [self sendAudioDeviceChangedEvent];
                     break;
                 case AVAudioSessionRouteChangeReasonWakeFromSleep:
                     NSLog(@"RNInCallManager.AudioRouteChange.Reason: WakeFromSleep");
@@ -849,6 +854,7 @@ RCT_EXPORT_METHOD(stopProximitySensor)
                     break;
                 case AVAudioSessionRouteChangeReasonRouteConfigurationChange:
                     NSLog(@"RNInCallManager.AudioRouteChange.Reason: RouteConfigurationChange. category=%@ mode=%@", self->_audioSession.category, self->_audioSession.mode);
+                    [self sendAudioDeviceChangedEvent];
                     break;
                 default:
                     NSLog(@"RNInCallManager.AudioRouteChange.Reason: Unknow Value");
@@ -1280,5 +1286,53 @@ RCT_EXPORT_METHOD(stopProximitySensor)
 //    }
 //    NSLog("RNInCallManager.debugAudioSession(): ==========END==========")
 //}
+
+- (void)sendAudioDeviceChangedEvent
+{
+    NSMutableArray *availableDevices = [NSMutableArray array];
+    NSString *selectedDevice = @"";
+    
+    // Always add speaker
+    [availableDevices addObject:@"SPEAKER_PHONE"];
+    
+    if ([self isWiredHeadsetPluggedIn]) {
+        [availableDevices addObject:@"WIRED_HEADSET"];
+        if ([self checkAudioRoute:@[AVAudioSessionPortHeadsetMic] routeType:@"input"]) {
+            selectedDevice = @"WIRED_HEADSET";
+        }
+    }
+    
+    if ([self checkAudioRoute:@[AVAudioSessionPortBluetoothA2DP, AVAudioSessionPortBluetoothHFP] routeType:@"output"]) {
+        [availableDevices addObject:@"BLUETOOTH"];
+        selectedDevice = @"BLUETOOTH";
+    }
+    
+    // Add earpiece if available
+    if ([self checkAudioRoute:@[AVAudioSessionPortBuiltInReceiver] routeType:@"output"]) {
+        [availableDevices addObject:@"EARPIECE"];
+        if ([selectedDevice isEqualToString:@""]) {
+            selectedDevice = @"EARPIECE";
+        }
+    }
+    
+    // If no device is selected yet, default to speaker
+    if ([selectedDevice isEqualToString:@""]) {
+        selectedDevice = @"SPEAKER_PHONE";
+    }
+    
+    // Convert array to JSON string
+    NSError *error;
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:availableDevices options:0 error:&error];
+    NSString *availableDevicesJson = @"[]";
+    
+    if (!error) {
+        availableDevicesJson = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+    }
+    
+    [self sendEventWithName:@"onAudioDeviceChanged" body:@{
+        @"availableAudioDeviceList": availableDevicesJson,
+        @"selectedAudioDevice": selectedDevice
+    }];
+}
 
 @end

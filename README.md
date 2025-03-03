@@ -258,6 +258,7 @@ Note: iOS only supports `auto` currently.
 | 'NoisyAudio'  | :smile: | :rage: | see [android doc](http://developer.android.com/reference/android/media/AudioManager.html#ACTION_AUDIO_BECOMING_NOISY).<br>data: `null` |
 | 'MediaButton' | :smile: | :rage: | when external device controler pressed button. see [android doc](http://developer.android.com/reference/android/content/Intent.html#ACTION_MEDIA_BUTTON) <br>data: `{'eventText': string, 'eventCode': number }` |
 | 'onAudioFocusChange' | :smile: | :rage: | see [android doc](http://developer.android.com/reference/android/media/AudioManager.OnAudioFocusChangeListener.html#onAudioFocusChange(int)) <br>data: `{'eventText': string, 'eventCode': number }` |
+| 'onAudioDeviceChanged' | :smile: | :smile: | triggered when audio device list or selected audio device changes <br>data: `{'availableAudioDeviceList': string, 'selectedAudioDevice': string }` |
 
 **NOTE: platform OS always has the final decision, so some toggle API may not work in some cases
 be careful when customizing your own behavior**
@@ -268,3 +269,56 @@ be careful when customizing your own behavior**
 
 ## Original Author:
 [![zxcpoiu](https://github.com/zxcpoiu.png)](https://github.com/zxcpoiu)
+
+## Events:
+```js
+import InCallManager from 'react-native-incall-manager';
+
+// --- Proximity
+InCallManager.addListener('Proximity', function(data) {
+  console.log('Proximity changed: ', data);
+  if (data.isNear) {
+    // --- the proximity sensor is covered (e.g., user putting their phone to their ear)
+  } else {
+    // --- the proximity sensor is uncovered (e.g., user moving their phone away from their ear)
+  }
+});
+
+// --- Wired Headset
+InCallManager.addListener('WiredHeadset', function(data) {
+  console.log('Wired Headset: ', data);
+  if (data.isPlugged) {
+    // --- wired headset is plugged
+    if (data.hasMic) {
+      // --- wired headset has a mic
+    }
+  } else {
+    // --- wired headset is unplugged
+  }
+});
+
+// --- Audio Device Changed
+InCallManager.addListener('onAudioDeviceChanged', function(data) {
+  console.log('Audio Device Changed: ', data);
+  console.log('Available devices: ', JSON.parse(data.availableAudioDeviceList));
+  console.log('Selected device: ', data.selectedAudioDevice);
+  
+  // Example of handling different audio device changes
+  switch(data.selectedAudioDevice) {
+    case 'SPEAKER_PHONE':
+      console.log('Speaker is now active');
+      break;
+    case 'WIRED_HEADSET':
+      console.log('Wired headset is now active');
+      break;
+    case 'BLUETOOTH':
+      console.log('Bluetooth device is now active');
+      break;
+    case 'EARPIECE':
+      console.log('Earpiece is now active');
+      break;
+  }
+});
+```
+
+use `InCallManager.removeListeners` to clean up.
